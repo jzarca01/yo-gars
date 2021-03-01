@@ -1,5 +1,11 @@
 const puppeteer = require("puppeteer");
 
+async function asyncForEach(array, callback) {
+  for (let index = 0; index < array.length; index++) {
+    await callback(array[index], index, array);
+  }
+}
+
 async function getContent(url, rootClass, options) {
   const browser = await puppeteer.launch({
     headless: true,
@@ -7,7 +13,7 @@ async function getContent(url, rootClass, options) {
   const page = await browser.newPage();
 
   const navigationPromise = page.waitForNavigation({
-    waitUntil: "networkidle0",
+    waitUntil: "load",
   });
 
   await page.goto(url);
@@ -32,6 +38,28 @@ async function getContent(url, rootClass, options) {
     rootClass,
     options
   );
+  await browser.close();
+  return results;
+}
+
+async function getVideo(url) {
+  const browser = await puppeteer.launch({
+    headless: true,
+  });
+  const page = await browser.newPage();
+
+  const navigationPromise = page.waitForNavigation({
+    waitUntil: "load",
+  });
+
+  await page.goto(url);
+
+  await navigationPromise;
+
+  const results = await page.evaluate(() => {
+    return document.querySelector("iframe").getAttribute("src");
+  });
+
   await browser.close();
   return results;
 }
@@ -78,6 +106,15 @@ async function getPosesByAnatomy(anatomy) {
 
 // getAnatomyList().then(console.log);
 
-getPosesByAnatomy("ankles").then((benefits) => {
-  console.log(benefits);
-});
+const myYogaSession = [];
+
+getPosesByAnatomy("ankles")
+  .then(async (benefits) => {
+    return asyncForEach(benefits, async (benefit) =>
+      myYogaSession.push({
+        ...benefit,
+        video: await getVideo(benefit.link),
+      })
+    );
+  })
+  .then(() => console.log(myYogaSession));
